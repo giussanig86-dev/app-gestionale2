@@ -1,0 +1,83 @@
+# ============================================================
+# GITHUB ACTIONS — Deploy automatico su Aruba
+# ============================================================
+# Posiziona questo file in: .github/workflows/deploy.yml
+#
+# Secrets da configurare su GitHub (Settings → Secrets):
+#   ARUBA_SSH_HOST     → IP del server Aruba
+#   ARUBA_SSH_USER     → utente SSH (es. gestionale)
+#   ARUBA_SSH_KEY      → chiave privata SSH (contenuto del file id_rsa)
+#   ARUBA_SSH_PORT     → porta SSH (es. 22 o personalizzata)
+# ============================================================
+
+name: Deploy su Aruba
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:          # permette avvio manuale da GitHub UI
+
+jobs:
+  deploy:
+    name: Deploy produzione
+    runs-on: ubuntu-latest
+    environment: production   # richiede approvazione manuale (opzionale)
+
+    steps:
+      - name: Checkout codice
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build client React
+        run: |
+          cd client
+          npm ci
+          npm run build
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ARUBA_SSH_HOST }}
+          username: ${{ secrets.ARUBA_SSH_USER }}
+          key: ${{ secrets.ARUBA_SSH_KEY }}
+          port: ${{ secrets.ARUBA_SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd /var/www/gestionale
+
+            echo "📥 Pull aggiornamenti..."
+            git pull origin main
+
+            echo "📦 Dipendenze backend..."
+            cd server && npm ci --omit=dev && cd ..
+
+            echo "🔄 Reload PM2 (zero-downtime)..."
+            pm2 reload deploy/ecosystem.config.js --env production --update-env
+
+            echo "✅ Deploy completato"
+            pm2 status gestionale
+
+      - name: Copia build client sul server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ARUBA_SSH_HOST }}
+          username: ${{ secrets.ARUBA_SSH_USER }}
+          key: ${{ secrets.ARUBA_SSH_KEY }}
+          port: ${{ secrets.ARUBA_SSH_PORT || 22 }}
+          source: "client/dist/*"
+          target: "/var/www/gestionale/client/dist"
+          strip_components: 2
+
+      - name: Notifica esito
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Deploy completato con successo"
+          else
+            echo "❌ Deploy fallito — controlla i log su GitHub Actions"
+          fi
