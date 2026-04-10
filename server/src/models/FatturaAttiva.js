@@ -84,7 +84,7 @@ const fatturaAttivaSchema = new mongoose.Schema({
   // Tracking
   insertMode: {
     type: String,
-    enum: ['manuale', 'api_cube'],
+    enum: ['manuale', 'api_cube', 'ade'],
     default: 'manuale'
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }

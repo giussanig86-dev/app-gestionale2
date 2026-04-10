@@ -5,10 +5,14 @@
 const { PORT } = require('./config/env');
 const connectDB = require('./config/db');
 const app = require('./app');
+const { startSyncJob } = require('./jobs/syncFattureJob');
 
 const startServer = async () => {
   // Connetti al database
   await connectDB();
+
+  // Avvia cron job sincronizzazione fatture AdE
+  startSyncJob();
 
   // Avvia server
   app.listen(PORT, () => {

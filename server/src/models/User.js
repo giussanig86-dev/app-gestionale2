@@ -167,6 +167,25 @@ const userSchema = new mongoose.Schema({
     configuredAt: Date
   },
 
+  // ============ ADE (Agenzia delle Entrate) ============
+  // Per i consulenti: configurazione certificato + schedule sync
+  // Per i clienti: stato delega presso AdE
+  ade: {
+    // Consulente
+    enabled: { type: Boolean, default: false },
+    certPath: { type: String, trim: true },
+    certPassword: { type: String, set: encrypt, get: decrypt },
+    syncSchedule: { type: String, default: '0 6 * * *' },
+    importOnlyAfter: Date,
+
+    // Condiviso (usato sia dal consulente che dal cliente)
+    lastSyncAt: Date,
+
+    // Cliente
+    inDelega: { type: Boolean, default: false },
+    delegaDal: Date
+  },
+
   // ============ CONSULENTE - PIANO SAAS ============
   consulente: {
     piano: {

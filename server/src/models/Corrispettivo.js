@@ -60,7 +60,7 @@ const corrispettivoSchema = new mongoose.Schema({
   // Tracking
   insertMode: {
     type: String,
-    enum: ['manuale', 'vocale', 'pos_automatico', 'import_registro_corrispettivi'],
+    enum: ['manuale', 'vocale', 'pos_automatico', 'import_registro_corrispettivi', 'ade'],
     default: 'manuale',
     required: true
   },
@@ -74,6 +74,13 @@ const corrispettivoSchema = new mongoose.Schema({
     type: String,
     trim: true,
     maxlength: 500
+  },
+
+  // AdE: campi per corrispettivi scaricati dal portale Fatture e Corrispettivi
+  ade: {
+    idFile: String,
+    identificativo: String,
+    importedAt: Date
   }
 
 }, {

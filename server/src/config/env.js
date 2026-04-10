@@ -24,5 +24,10 @@ module.exports = {
   ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT, 10) || 5000,
-  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173'
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
+
+  // ADE (Agenzia delle Entrate) - Portale Fatture e Corrispettivi
+  ADE_BASE_URL: process.env.ADE_BASE_URL || 'https://ivaservizi.agenziaentrate.gov.it/ser',
+  ADE_CERT_PATH: process.env.ADE_CERT_PATH || null,
+  ADE_CERT_PASSWORD: process.env.ADE_CERT_PASSWORD || null
 };

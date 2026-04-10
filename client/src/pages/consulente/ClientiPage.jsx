@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Users, Eye, Mail, Phone, ChevronRight, UserPlus } from 'lucide-react'
+import { Plus, Search, Users, Eye, Mail, Phone, ChevronRight, UserPlus, RefreshCw, Building2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
 import { formatEuro, cn } from '@/lib/utils'
@@ -7,6 +7,7 @@ import PageHeader from '@/components/shared/PageHeader'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import EmptyState from '@/components/shared/EmptyState'
 import { useOutletContext } from 'react-router-dom'
+import SyncResultModal from '@/components/SyncResultModal'
 
 export default function ClientiPage() {
   const { anno } = useOutletContext()
@@ -15,6 +16,9 @@ export default function ClientiPage() {
   const [search, setSearch] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [showSyncModal, setShowSyncModal] = useState(false)
+  const [syncLogId, setSyncLogId] = useState(null)
   const [newForm, setNewForm] = useState({
     nome: '', cognome: '', email: '', telefono: '', password: 'Taxi2026!',
   })
@@ -32,6 +36,23 @@ export default function ClientiPage() {
       console.error('Errore caricamento clienti:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleSyncAde() {
+    setSyncing(true)
+    try {
+      const res = await api.post('/ade/sync')
+      // Recupera l'ultimo logId per mostrare il progresso
+      const logsRes = await api.get('/ade/sync/logs')
+      const lastLog = logsRes.data.data?.logs?.[0]
+      if (lastLog?._id) setSyncLogId(lastLog._id)
+      setShowSyncModal(true)
+    } catch (err) {
+      const msg = err.response?.data?.messaggio || err.message
+      alert(`Errore: ${msg}`)
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -58,17 +79,36 @@ export default function ClientiPage() {
            c.email?.toLowerCase().includes(q)
   })
 
+  const clientiInDelega = clienti.filter((c) => c.ade?.inDelega).length
+
   if (loading) return <LoadingSpinner />
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="I Miei Clienti"
-        subtitle={`${clienti.length} clienti registrati`}
-        actionLabel="Nuovo Cliente"
-        actionIcon={UserPlus}
-        onAction={() => setShowNew(true)}
-      />
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">I Miei Clienti</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{clienti.length} clienti registrati</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {clientiInDelega > 0 && (
+            <button
+              onClick={handleSyncAde}
+              disabled={syncing}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={cn('w-4 h-4', syncing && 'animate-spin')} />
+              {syncing ? 'Avvio sync...' : `Sincronizza Fatture AdE (${clientiInDelega})`}
+            </button>
+          )}
+          <button
+            onClick={() => setShowNew(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <UserPlus className="w-4 h-4" /> Nuovo Cliente
+          </button>
+        </div>
+      </div>
 
       {/* Ricerca */}
       <div className="relative max-w-md">
@@ -130,19 +170,32 @@ export default function ClientiPage() {
                       <p className="text-sm font-semibold text-green-600">{formatEuro(c.fatturato || 0)}</p>
                       <p className="text-[10px] text-gray-400">Fatturato {anno}</p>
                     </div>
-                    {c.costiPendenti > 0 && (
-                      <div className="text-center ml-auto">
+                    <div className="ml-auto flex items-center gap-1.5">
+                      {c.ade?.inDelega && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600">
+                          <Building2 className="w-2.5 h-2.5" /> AdE
+                        </span>
+                      )}
+                      {c.costiPendenti > 0 && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-600">
                           {c.costiPendenti} da approvare
                         </span>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </Link>
           ))}
         </div>
+      )}
+
+      {/* Modal sync AdE */}
+      {showSyncModal && (
+        <SyncResultModal
+          logId={syncLogId}
+          onClose={() => { setShowSyncModal(false); setSyncLogId(null) }}
+        />
       )}
 
       {/* Modal nuovo cliente */}

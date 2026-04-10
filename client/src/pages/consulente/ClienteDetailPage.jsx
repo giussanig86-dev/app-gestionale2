@@ -4,8 +4,10 @@ import {
   ArrowLeft, TrendingUp, Receipt, FileText, Landmark,
   Calculator, Plus, Trash2, Edit3, Upload, CheckCircle,
   FolderOpen, Download, FileSpreadsheet, Image, AlertCircle, ChevronDown,
-  Save, User, Car, Archive, History, Paperclip, X as XIcon
+  Save, User, Car, Archive, History, Paperclip, X as XIcon,
+  Building2, RefreshCw
 } from 'lucide-react'
+import SyncResultModal from '@/components/SyncResultModal'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import api from '@/lib/api'
 import { formatEuro, formatData, cn, MESI } from '@/lib/utils'
@@ -52,6 +54,13 @@ export default function ClienteDetailPage() {
   const [anagraficaForm, setAnagraficaForm] = useState(null)
   const [savingAnagrafica, setSavingAnagrafica] = useState(false)
   const [anagraficaSuccess, setAnagraficaSuccess] = useState('')
+
+  // Delega AdE
+  const [adeDelega, setAdeDelega] = useState({ inDelega: false, delegaDal: '' })
+  const [savingAde, setSavingAde] = useState(false)
+  const [syncingCliente, setSyncingCliente] = useState(false)
+  const [showSyncModal, setShowSyncModal] = useState(false)
+  const [syncLogId, setSyncLogId] = useState(null)
 
   // Veicolo
   const [veicoli, setVeicoli] = useState(null)
@@ -141,6 +150,10 @@ export default function ClienteDetailPage() {
         comuneRilascioLicenza: c.comuneRilascioLicenza || '',
         codiceFiscale: c.codiceFiscale || '',
         partitaIva: c.partitaIva || '',
+      })
+      setAdeDelega({
+        inDelega: c.ade?.inDelega || false,
+        delegaDal: c.ade?.delegaDal ? new Date(c.ade.delegaDal).toISOString().split('T')[0] : '',
       })
     } catch (err) {
       console.error('Errore caricamento cliente:', err)
@@ -389,6 +402,38 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
       alert(err.response?.data?.messaggio || err.response?.data?.message || 'Errore salvataggio')
     } finally {
       setSavingAnagrafica(false)
+    }
+  }
+
+  async function handleSaveAdeDelega(e) {
+    e.preventDefault()
+    setSavingAde(true)
+    try {
+      await api.patch(`/ade/clienti/${id}/delega`, {
+        inDelega: adeDelega.inDelega,
+        delegaDal: adeDelega.delegaDal || undefined,
+      })
+      setAnagraficaSuccess('Delega AdE aggiornata con successo')
+      setTimeout(() => setAnagraficaSuccess(''), 3000)
+    } catch (err) {
+      alert(err.response?.data?.messaggio || 'Errore salvataggio delega AdE')
+    } finally {
+      setSavingAde(false)
+    }
+  }
+
+  async function handleSyncCliente() {
+    setSyncingCliente(true)
+    try {
+      await api.post(`/ade/sync/${id}`)
+      const logsRes = await api.get('/ade/sync/logs')
+      const lastLog = logsRes.data.data?.logs?.[0]
+      if (lastLog?._id) setSyncLogId(lastLog._id)
+      setShowSyncModal(true)
+    } catch (err) {
+      alert(err.response?.data?.messaggio || 'Errore avvio sync')
+    } finally {
+      setSyncingCliente(false)
     }
   }
 
@@ -834,7 +879,73 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
               </div>
             )}
           </div>
+
+          {/* Delega AdE */}
+          <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-600" /> Delega Agenzia delle Entrate
+              </h3>
+              {adeDelega.inDelega && cliente?.ade?.lastSyncAt && (
+                <span className="text-xs text-gray-400">
+                  Ultimo sync: {new Date(cliente.ade.lastSyncAt).toLocaleDateString('it-IT')}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              Attiva questa opzione se il cliente ha conferito la delega al consulente
+              per accedere al portale Fatture e Corrispettivi dell'AdE.
+            </p>
+            <form onSubmit={handleSaveAdeDelega} className="space-y-4">
+              <div className="flex items-center justify-between py-1">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Cliente in delega AdE</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Abilita il download automatico delle sue fatture</p>
+                </div>
+                <button type="button"
+                  onClick={() => setAdeDelega({ ...adeDelega, inDelega: !adeDelega.inDelega })}
+                  className={cn(
+                    'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                    adeDelega.inDelega ? 'bg-blue-600' : 'bg-gray-200'
+                  )}>
+                  <span className={cn(
+                    'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                    adeDelega.inDelega ? 'translate-x-6' : 'translate-x-1'
+                  )} />
+                </button>
+              </div>
+              {adeDelega.inDelega && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Data inizio delega</label>
+                  <input type="date" value={adeDelega.delegaDal}
+                    onChange={(e) => setAdeDelega({ ...adeDelega, delegaDal: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <button type="submit" disabled={savingAde}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2">
+                  <Save className="w-3.5 h-3.5" />{savingAde ? 'Salvataggio...' : 'Salva'}
+                </button>
+                {adeDelega.inDelega && (
+                  <button type="button" onClick={handleSyncCliente} disabled={syncingCliente}
+                    className="px-4 py-2 border border-blue-200 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors disabled:opacity-50 flex items-center gap-2">
+                    <RefreshCw className={cn('w-3.5 h-3.5', syncingCliente && 'animate-spin')} />
+                    {syncingCliente ? 'Avvio...' : 'Sincronizza ora'}
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
         </div>
+      )}
+
+      {/* Modal sync AdE */}
+      {showSyncModal && (
+        <SyncResultModal
+          logId={syncLogId}
+          onClose={() => { setShowSyncModal(false); setSyncLogId(null) }}
+        />
       )}
 
       {/* Veicolo */}

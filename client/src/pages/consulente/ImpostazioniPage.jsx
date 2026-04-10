@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, Settings, Shield, CreditCard, Bell, User } from 'lucide-react'
+import { Save, Settings, Shield, CreditCard, Bell, User, Building2, RefreshCw, CheckCircle, XCircle, Clock } from 'lucide-react'
 import api from '@/lib/api'
 import { cn, formatEuro } from '@/lib/utils'
 import { PIANI_SAAS } from '@/lib/constants'
@@ -20,9 +20,14 @@ export default function ImpostazioniPage() {
   const [passwordForm, setPasswordForm] = useState({
     passwordAttuale: '', nuovaPassword: '', confermaPassword: '',
   })
+  const [adeConfig, setAdeConfig] = useState({
+    enabled: false, certPath: '', certPassword: '', syncSchedule: '0 6 * * *', importOnlyAfter: '',
+  })
+  const [adeStatus, setAdeStatus] = useState(null)
 
   useEffect(() => {
     fetchProfilo()
+    fetchAdeStatus()
   }, [])
 
   async function fetchProfilo() {
@@ -39,10 +44,49 @@ export default function ImpostazioniPage() {
         studioIndirizzo: u.studio?.indirizzo || '',
         studioPec: u.studio?.pec || '',
       })
+      if (u.ade) {
+        setAdeConfig({
+          enabled: u.ade.enabled || false,
+          certPath: u.ade.certPath || '',
+          certPassword: '',
+          syncSchedule: u.ade.syncSchedule || '0 6 * * *',
+          importOnlyAfter: u.ade.importOnlyAfter
+            ? new Date(u.ade.importOnlyAfter).toISOString().split('T')[0]
+            : '',
+        })
+      }
     } catch (err) {
       console.error('Errore caricamento profilo:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchAdeStatus() {
+    try {
+      const res = await api.get('/ade/status')
+      setAdeStatus(res.data.data)
+    } catch {
+      // Ignora se non disponibile
+    }
+  }
+
+  async function handleSaveAde(e) {
+    e.preventDefault()
+    setSaving(true)
+    setSuccess('')
+    try {
+      const payload = { ...adeConfig }
+      if (!payload.certPassword) delete payload.certPassword
+      if (payload.importOnlyAfter === '') delete payload.importOnlyAfter
+      await api.patch('/ade/config', payload)
+      setSuccess('Configurazione AdE salvata con successo')
+      setTimeout(() => setSuccess(''), 3000)
+      fetchAdeStatus()
+    } catch (err) {
+      alert(err.response?.data?.messaggio || 'Errore salvataggio configurazione AdE')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -101,6 +145,7 @@ export default function ImpostazioniPage() {
     { key: 'profilo', label: 'Profilo & Studio', icon: User },
     { key: 'piano', label: 'Piano SaaS', icon: CreditCard },
     { key: 'sicurezza', label: 'Sicurezza', icon: Shield },
+    { key: 'ade', label: 'Integrazione AdE', icon: Building2 },
   ]
 
   if (loading) return <LoadingSpinner />
@@ -263,6 +308,116 @@ export default function ImpostazioniPage() {
             <Shield className="w-4 h-4" />{saving ? 'Aggiornamento...' : 'Cambia Password'}
           </button>
         </form>
+      )}
+
+      {/* Tab Integrazione AdE */}
+      {activeTab === 'ade' && (
+        <div className="space-y-6 max-w-lg">
+          {/* Stato attuale */}
+          {adeStatus && (
+            <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-3">
+              <h3 className="font-semibold text-gray-800">Stato Integrazione</h3>
+              <div className="flex items-center gap-3">
+                <span className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium',
+                  adeStatus.ade?.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                )}>
+                  {adeStatus.ade?.enabled ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                  {adeStatus.ade?.enabled ? 'Attiva' : 'Non attiva'}
+                </span>
+                <span className="text-sm text-gray-500">
+                  {adeStatus.clientiInDelega || 0} clienti in delega
+                </span>
+              </div>
+              {adeStatus.ultimoSync && (
+                <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  Ultimo sync: {new Date(adeStatus.ultimoSync.syncStartedAt).toLocaleString('it-IT')}
+                  {' · '}
+                  {adeStatus.ultimoSync.fattureImportate || 0} importate
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Configurazione */}
+          <form onSubmit={handleSaveAde} className="bg-white rounded-xl border border-gray-100 p-6 space-y-5">
+            <h3 className="font-semibold text-gray-800">Configurazione Certificato</h3>
+            <p className="text-xs text-gray-500">
+              L'integrazione con il portale Fatture e Corrispettivi dell'Agenzia delle Entrate
+              richiede un certificato digitale PFX/P12 rilasciato da AdE per il consulente intermediario.
+            </p>
+
+            {/* Toggle abilitazione */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Abilita integrazione AdE</p>
+                <p className="text-xs text-gray-500 mt-0.5">Attiva il download automatico di fatture e corrispettivi</p>
+              </div>
+              <button type="button"
+                onClick={() => setAdeConfig({ ...adeConfig, enabled: !adeConfig.enabled })}
+                className={cn(
+                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                  adeConfig.enabled ? 'bg-primary' : 'bg-gray-200'
+                )}>
+                <span className={cn(
+                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                  adeConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+                )} />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Path certificato PFX sul server
+              </label>
+              <input type="text" value={adeConfig.certPath}
+                onChange={(e) => setAdeConfig({ ...adeConfig, certPath: e.target.value })}
+                placeholder="Es. /etc/certs/consulente.pfx"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+              <p className="text-xs text-gray-400 mt-1">
+                Se vuoto, usa la variabile d'ambiente ADE_CERT_PATH
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Password certificato PFX
+              </label>
+              <input type="password" value={adeConfig.certPassword}
+                onChange={(e) => setAdeConfig({ ...adeConfig, certPassword: e.target.value })}
+                placeholder="Lascia vuoto per non modificare"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Non importare fatture precedenti al
+              </label>
+              <input type="date" value={adeConfig.importOnlyAfter}
+                onChange={(e) => setAdeConfig({ ...adeConfig, importOnlyAfter: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Orario sync automatico (cron)
+              </label>
+              <input type="text" value={adeConfig.syncSchedule}
+                onChange={(e) => setAdeConfig({ ...adeConfig, syncSchedule: e.target.value })}
+                placeholder="0 6 * * *"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+              <p className="text-xs text-gray-400 mt-1">
+                Formato cron. Default: <code>0 6 * * *</code> (ogni giorno alle 06:00)
+              </p>
+            </div>
+
+            <button type="submit" disabled={saving}
+              className="px-6 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+              <Save className="w-4 h-4" />{saving ? 'Salvataggio...' : 'Salva Configurazione'}
+            </button>
+          </form>
+        </div>
       )}
     </div>
   )
