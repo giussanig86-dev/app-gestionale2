@@ -150,6 +150,55 @@ class AdeClient {
     });
     return Buffer.from(response.data).toString('utf-8');
   }
+
+  // ═══════════════════════════════════════════════════════
+  //  METODI DI TRASMISSIONE (POST al SDI/AdE)
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * Trasmette una FatturaPA firmata al SDI tramite il canale AdE.
+   * @param {string} xmlFirmato  - XML FatturaPA con firma XAdES-BES
+   * @param {string} cfCedente   - Codice fiscale o PIVA del cedente (tassista)
+   * @returns {Promise<{ identificativoSdi: string, statoTrasmissione: string }>}
+   */
+  async trasmettiFattura(xmlFirmato, cfCedente) {
+    const response = await this.client.post(
+      '/api/v1/trasmissione/trasmetti',
+      xmlFirmato,
+      {
+        headers: { 'Content-Type': 'application/xml' },
+        params: { cfCedente }
+      }
+    );
+    return response.data;
+  }
+
+  /**
+   * Trasmette corrispettivi giornalieri firmati all'AdE.
+   * @param {string} xmlFirmato  - XML corrispettivi con firma XAdES-BES
+   * @param {string} cf          - Codice fiscale del soggetto trasmittente
+   * @returns {Promise<{ idTrasmissione: string }>}
+   */
+  async trasmettiCorrispettivi(xmlFirmato, cf) {
+    const response = await this.client.post(
+      '/api/v1/corrispettivi/trasmetti',
+      xmlFirmato,
+      {
+        headers: { 'Content-Type': 'application/xml' },
+        params: { cf }
+      }
+    );
+    return response.data;
+  }
+
+  /**
+   * Verifica lo stato di una trasmissione precedente (polling ricevuta SDI).
+   * @param {string} idTrasmissione - Identificativo restituito dalla trasmissione
+   * @returns {Promise<{ statoAttuale: string, dataAggiornamento: string }>}
+   */
+  async getStatoTrasmissione(idTrasmissione) {
+    return this.request(`/api/v1/trasmissione/stato/${idTrasmissione}`);
+  }
 }
 
 module.exports = AdeClient;

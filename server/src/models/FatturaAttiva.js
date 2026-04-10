@@ -63,12 +63,13 @@ const fatturaAttivaSchema = new mongoose.Schema({
     dataTrasmissione: Date,
     statoTrasmissione: {
       type: String,
-      enum: ['bozza', 'inviata', 'consegnata', 'rifiutata', 'scartata'],
+      enum: ['bozza', 'inviata', 'consegnata', 'rifiutata', 'scartata', 'errore'],
       default: 'bozza',
       index: true
     },
     notificaSDI: String,
     motivoScarto: String,
+    erroreTrasmissione: String,
     xmlFilePath: String,
     xmlHash: String
   },

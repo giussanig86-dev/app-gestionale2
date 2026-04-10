@@ -5,9 +5,10 @@ import {
   Calculator, Plus, Trash2, Edit3, Upload, CheckCircle,
   FolderOpen, Download, FileSpreadsheet, Image, AlertCircle, ChevronDown,
   Save, User, Car, Archive, History, Paperclip, X as XIcon,
-  Building2, RefreshCw
+  Building2, RefreshCw, Send
 } from 'lucide-react'
 import SyncResultModal from '@/components/SyncResultModal'
+import TrasmissioneModal from '@/components/TrasmissioneModal'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import api from '@/lib/api'
 import { formatEuro, formatData, cn, MESI } from '@/lib/utils'
@@ -61,6 +62,11 @@ export default function ClienteDetailPage() {
   const [syncingCliente, setSyncingCliente] = useState(false)
   const [showSyncModal, setShowSyncModal] = useState(false)
   const [syncLogId, setSyncLogId] = useState(null)
+
+  // Trasmissione corrispettivi
+  const [showTrasmissioneModal, setShowTrasmissioneModal] = useState(false)
+  // Trasmissione singola fattura
+  const [trasmettendoFattura, setTrasmettendoFattura] = useState(null) // fatturaId in progress
 
   // Veicolo
   const [veicoli, setVeicoli] = useState(null)
@@ -434,6 +440,18 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
       alert(err.response?.data?.messaggio || 'Errore avvio sync')
     } finally {
       setSyncingCliente(false)
+    }
+  }
+
+  async function handleTrasmettiFattura(fatturaId) {
+    setTrasmettendoFattura(fatturaId)
+    try {
+      await api.post(`/ade/trasmetti/fattura/${fatturaId}`)
+      reloadTab('fatture')
+    } catch (err) {
+      alert(err.response?.data?.messaggio || err.response?.data?.message || 'Errore trasmissione fattura')
+    } finally {
+      setTrasmettendoFattura(null)
     }
   }
 
@@ -1153,6 +1171,12 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <span className="text-sm font-medium text-gray-700">Corrispettivi {anno}</span>
             <div className="flex items-center gap-2">
+              {cliente?.ade?.inDelega && (
+                <button onClick={() => setShowTrasmissioneModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition-colors">
+                  <Send className="w-3.5 h-3.5" /> Trasmetti AdE
+                </button>
+              )}
               <button onClick={() => setShowImportCorrispettivi(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-xs font-medium hover:bg-gray-200 transition-colors">
                 <Upload className="w-3.5 h-3.5" /> Importa Registro
@@ -1351,6 +1375,7 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
                     <th className="px-4 py-3 font-medium">Cliente</th>
                     <th className="px-4 py-3 font-medium">Importo</th>
                     <th className="px-4 py-3 font-medium">Stato SDI</th>
+                    <th className="px-4 py-3 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -1361,10 +1386,25 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
                       <td className="px-4 py-3">{f.cliente?.denominazione || '—'}</td>
                       <td className="px-4 py-3 font-semibold">{formatEuro(f.importoNetto)}</td>
                       <td className="px-4 py-3"><StatusBadge status={f.statoSdi} type="sdi" /></td>
+                      <td className="px-4 py-3">
+                        {f.statoSdi === 'bozza' && !f.sdi?.trasmessa && (
+                          <button
+                            onClick={() => handleTrasmettiFattura(f._id)}
+                            disabled={trasmettendoFattura === f._id}
+                            title="Trasmetti al SDI"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition-colors disabled:opacity-50"
+                          >
+                            {trasmettendoFattura === f._id
+                              ? <RefreshCw className="w-3 h-3 animate-spin" />
+                              : <Send className="w-3 h-3" />}
+                            Trasmetti
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {(!fatture || fatture.length === 0) && (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Nessuna fattura</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Nessuna fattura</td></tr>
                   )}
                 </tbody>
               </table>
@@ -1577,6 +1617,13 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
         onCancel={() => setDeleteTarget(null)}
         variant="danger"
       />
+
+      {showTrasmissioneModal && (
+        <TrasmissioneModal
+          clienteId={id}
+          onClose={() => setShowTrasmissioneModal(false)}
+        />
+      )}
     </div>
   )
 }

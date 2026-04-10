@@ -9,6 +9,12 @@ const SdiSyncLog = require('../models/SdiSyncLog');
 const AppError = require('../utils/AppError');
 const catchAsync = require('../utils/catchAsync');
 const { syncAllClientiPerConsulente, syncClienteById } = require('../services/syncFattureAde');
+const {
+  trasmettiFattura,
+  trasmettiFattureCliente,
+  trasmettiCorrispettiviGiorno,
+  trasmettiCorrispettiviMese
+} = require('../services/sdiTransmissionService');
 
 /**
  * POST /api/v1/ade/sync
@@ -148,6 +154,85 @@ exports.getStatus = catchAsync(async (req, res) => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════
+//  TRASMISSIONE FATTURE E CORRISPETTIVI
+// ═══════════════════════════════════════════════════════
+
+/**
+ * POST /api/v1/ade/trasmetti/fattura/:fatturaId
+ * Trasmette una singola fattura attiva al SDI.
+ */
+exports.trasmettiFattura = catchAsync(async (req, res, next) => {
+  const { fatturaId } = req.params;
+  try {
+    const result = await trasmettiFattura(fatturaId, req.user._id);
+    res.status(200).json({
+      status: 'success',
+      messaggio: 'Fattura trasmessa al SDI con successo.',
+      data: result
+    });
+  } catch (err) {
+    return next(new AppError(err.message, 400));
+  }
+});
+
+/**
+ * POST /api/v1/ade/trasmetti/fatture/:clienteId
+ * Trasmette tutte le fatture bozza di un cliente al SDI.
+ */
+exports.trasmettiFattureCliente = catchAsync(async (req, res, next) => {
+  const { clienteId } = req.params;
+  try {
+    const result = await trasmettiFattureCliente(clienteId, req.user._id);
+    res.status(200).json({
+      status: 'success',
+      messaggio: `Trasmissione completata: ${result.trasmesse} inviate, ${result.errori} errori.`,
+      data: result
+    });
+  } catch (err) {
+    return next(new AppError(err.message, 400));
+  }
+});
+
+/**
+ * POST /api/v1/ade/trasmetti/corrispettivi/:clienteId
+ * Trasmette corrispettivi all'AdE.
+ * Body: { data?: 'YYYY-MM-DD', anno?: number, mese?: number }
+ * Se `data` è fornita → trasmette solo quella giornata.
+ * Se `anno` + `mese` → trasmette l'intero mese.
+ */
+exports.trasmettiCorrispettivi = catchAsync(async (req, res, next) => {
+  const { clienteId } = req.params;
+  const { data, anno, mese } = req.body;
+
+  try {
+    let result;
+    if (data) {
+      result = await trasmettiCorrispettiviGiorno(clienteId, req.user._id, new Date(data));
+      res.status(200).json({
+        status: 'success',
+        messaggio: `${result.count} corrispettivi trasmessi per il ${data}.`,
+        data: result
+      });
+    } else if (anno && mese) {
+      result = await trasmettiCorrispettiviMese(clienteId, req.user._id, Number(anno), Number(mese));
+      res.status(200).json({
+        status: 'success',
+        messaggio: `${result.giorniTrasmessi} giorni trasmessi, ${result.giorniErrori} errori.`,
+        data: result
+      });
+    } else {
+      return next(new AppError('Specifica una data (data) o un periodo (anno + mese).', 400));
+    }
+  } catch (err) {
+    return next(new AppError(err.message, 400));
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+//  CONFIGURAZIONE
+// ═══════════════════════════════════════════════════════
 
 /**
  * PATCH /api/v1/ade/config

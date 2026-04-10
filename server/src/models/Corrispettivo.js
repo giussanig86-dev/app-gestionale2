@@ -77,10 +77,16 @@ const corrispettivoSchema = new mongoose.Schema({
   },
 
   // AdE: campi per corrispettivi scaricati dal portale Fatture e Corrispettivi
+  //      e per la trasmissione corrispettivi telematici all'AdE
   ade: {
+    // Download (sync)
     idFile: String,
     identificativo: String,
-    importedAt: Date
+    importedAt: Date,
+    // Trasmissione
+    trasmesso: { type: Boolean, default: false },
+    dataTrasmissione: Date,
+    idTrasmissione: String
   }
 
 }, {
