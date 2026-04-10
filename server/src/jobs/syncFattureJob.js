@@ -37,24 +37,28 @@ function startSyncJob() {
       return;
     }
 
-    console.log(`[ADE Sync] ${consulenti.length} consulente/i da sincronizzare.`);
+    console.log(`[ADE Sync] ${consulenti.length} consulente/i da sincronizzare (jitter 0-60 min).`);
 
     for (const consulente of consulenti) {
-      try {
-        console.log(`[ADE Sync] Sync consulente: ${consulente.nome} ${consulente.cognome}`);
-        const risultato = await syncAllClientiPerConsulente(consulente._id);
-        console.log(
-          `[ADE Sync] Consulente ${consulente._id}: ` +
-          `importate=${risultato.fattureImportate}, ` +
-          `duplicate=${risultato.fattureDuplicate}, ` +
-          `errori=${risultato.fattureErrori}`
-        );
-      } catch (err) {
-        console.error(`[ADE Sync] Errore sync consulente ${consulente._id}:`, err.message);
-      }
+      const jitterMs = Math.floor(Math.random() * 60 * 60 * 1000);
+      const jitterMin = Math.round(jitterMs / 60000);
+      console.log(`[ADE Sync] Consulente ${consulente._id} (${consulente.nome} ${consulente.cognome}): partenza tra ${jitterMin} min`);
+      setTimeout(async () => {
+        try {
+          const risultato = await syncAllClientiPerConsulente(consulente._id);
+          console.log(
+            `[ADE Sync] Consulente ${consulente._id}: ` +
+            `importate=${risultato.fattureImportate}, ` +
+            `duplicate=${risultato.fattureDuplicate}, ` +
+            `errori=${risultato.fattureErrori}`
+          );
+        } catch (err) {
+          console.error(`[ADE Sync] Errore sync consulente ${consulente._id}:`, err.message);
+        }
+      }, jitterMs);
     }
 
-    console.log('[ADE Sync] Sincronizzazione automatica completata.');
+    console.log('[ADE Sync] Sync schedulati con jitter — completamento entro le 07:00.');
   }, {
     timezone: 'Europe/Rome'
   });
