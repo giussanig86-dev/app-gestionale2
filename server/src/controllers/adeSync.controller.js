@@ -265,7 +265,7 @@ exports.updateConfig = catchAsync(async (req, res) => {
  * Aggiorna il flag inDelega e la data delega di un cliente.
  */
 exports.updateDelegaCliente = catchAsync(async (req, res, next) => {
-  const { inDelega, delegaDal } = req.body;
+  const { inDelega, delegaDal, trasmetteCorrispettivi } = req.body;
   const { clienteId } = req.params;
 
   const cliente = await User.findOne({
@@ -279,6 +279,7 @@ exports.updateDelegaCliente = catchAsync(async (req, res, next) => {
   const updates = {};
   if (inDelega !== undefined) updates['ade.inDelega'] = inDelega;
   if (delegaDal !== undefined) updates['ade.delegaDal'] = delegaDal;
+  if (trasmetteCorrispettivi !== undefined) updates['ade.trasmetteCorrispettivi'] = trasmetteCorrispettivi;
 
   const updated = await User.findByIdAndUpdate(clienteId, updates, { new: true });
 

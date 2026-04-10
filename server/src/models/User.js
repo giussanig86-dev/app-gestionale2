@@ -183,7 +183,8 @@ const userSchema = new mongoose.Schema({
 
     // Cliente
     inDelega: { type: Boolean, default: false },
-    delegaDal: Date
+    delegaDal: Date,
+    trasmetteCorrispettivi: { type: Boolean, default: false } // es. NCC con obbligo RT
   },
 
   // ============ CONSULENTE - PIANO SAAS ============

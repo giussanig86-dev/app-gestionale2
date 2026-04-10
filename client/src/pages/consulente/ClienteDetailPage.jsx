@@ -57,7 +57,7 @@ export default function ClienteDetailPage() {
   const [anagraficaSuccess, setAnagraficaSuccess] = useState('')
 
   // Delega AdE
-  const [adeDelega, setAdeDelega] = useState({ inDelega: false, delegaDal: '' })
+  const [adeDelega, setAdeDelega] = useState({ inDelega: false, delegaDal: '', trasmetteCorrispettivi: false })
   const [savingAde, setSavingAde] = useState(false)
   const [syncingCliente, setSyncingCliente] = useState(false)
   const [showSyncModal, setShowSyncModal] = useState(false)
@@ -160,6 +160,7 @@ export default function ClienteDetailPage() {
       setAdeDelega({
         inDelega: c.ade?.inDelega || false,
         delegaDal: c.ade?.delegaDal ? new Date(c.ade.delegaDal).toISOString().split('T')[0] : '',
+        trasmetteCorrispettivi: c.ade?.trasmetteCorrispettivi || false,
       })
     } catch (err) {
       console.error('Errore caricamento cliente:', err)
@@ -418,6 +419,7 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
       await api.patch(`/ade/clienti/${id}/delega`, {
         inDelega: adeDelega.inDelega,
         delegaDal: adeDelega.delegaDal || undefined,
+        trasmetteCorrispettivi: adeDelega.trasmetteCorrispettivi,
       })
       setAnagraficaSuccess('Delega AdE aggiornata con successo')
       setTimeout(() => setAnagraficaSuccess(''), 3000)
@@ -933,12 +935,31 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
                 </button>
               </div>
               {adeDelega.inDelega && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Data inizio delega</label>
-                  <input type="date" value={adeDelega.delegaDal}
-                    onChange={(e) => setAdeDelega({ ...adeDelega, delegaDal: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Data inizio delega</label>
+                    <input type="date" value={adeDelega.delegaDal}
+                      onChange={(e) => setAdeDelega({ ...adeDelega, delegaDal: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                  </div>
+                  <div className="flex items-center justify-between py-1">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Trasmissione corrispettivi (NCC)</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Abilita solo per clienti con obbligo di RT (es. NCC)</p>
+                    </div>
+                    <button type="button"
+                      onClick={() => setAdeDelega({ ...adeDelega, trasmetteCorrispettivi: !adeDelega.trasmetteCorrispettivi })}
+                      className={cn(
+                        'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                        adeDelega.trasmetteCorrispettivi ? 'bg-blue-600' : 'bg-gray-200'
+                      )}>
+                      <span className={cn(
+                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                        adeDelega.trasmetteCorrispettivi ? 'translate-x-6' : 'translate-x-1'
+                      )} />
+                    </button>
+                  </div>
+                </>
               )}
               <div className="flex items-center gap-3">
                 <button type="submit" disabled={savingAde}
@@ -1171,7 +1192,7 @@ td{padding:6px 8px;border-bottom:1px solid #f0f0f0}tr:nth-child(even) td{backgro
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <span className="text-sm font-medium text-gray-700">Corrispettivi {anno}</span>
             <div className="flex items-center gap-2">
-              {cliente?.ade?.inDelega && (
+              {cliente?.ade?.inDelega && cliente?.ade?.trasmetteCorrispettivi && (
                 <button onClick={() => setShowTrasmissioneModal(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition-colors">
                   <Send className="w-3.5 h-3.5" /> Trasmetti AdE
