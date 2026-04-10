@@ -29,5 +29,10 @@ module.exports = {
   // ADE (Agenzia delle Entrate) - Portale Fatture e Corrispettivi
   ADE_BASE_URL: process.env.ADE_BASE_URL || 'https://ivaservizi.agenziaentrate.gov.it/ser',
   ADE_CERT_PATH: process.env.ADE_CERT_PATH || null,
-  ADE_CERT_PASSWORD: process.env.ADE_CERT_PASSWORD || null
+  ADE_CERT_PASSWORD: process.env.ADE_CERT_PASSWORD || null,
+
+  // A-CUBE (Scontrino Elettronico Smart / documenti commerciali)
+  APICUBE_CLIENT_ID: process.env.APICUBE_CLIENT_ID || null,
+  APICUBE_CLIENT_SECRET: process.env.APICUBE_CLIENT_SECRET || null,
+  APICUBE_BASE_URL: process.env.APICUBE_BASE_URL || 'https://api.acube.it'
 };

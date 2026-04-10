@@ -18,5 +18,6 @@ router.use('/veicoli',    require('./veicoli.routes'));
 router.use('/notifiche',  require('./notifiche.routes'));
 router.use('/admin', require('./admin.routes'));
 router.use('/ade', require('./adeSync.routes'));
+router.use('/acube', require('./aCube.routes'));
 
 module.exports = router;

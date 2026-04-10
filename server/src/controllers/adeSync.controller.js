@@ -11,9 +11,7 @@ const catchAsync = require('../utils/catchAsync');
 const { syncAllClientiPerConsulente, syncClienteById } = require('../services/syncFattureAde');
 const {
   trasmettiFattura,
-  trasmettiFattureCliente,
-  trasmettiCorrispettiviGiorno,
-  trasmettiCorrispettiviMese
+  trasmettiFattureCliente
 } = require('../services/sdiTransmissionService');
 
 /**
@@ -195,44 +193,11 @@ exports.trasmettiFattureCliente = catchAsync(async (req, res, next) => {
   }
 });
 
-/**
- * POST /api/v1/ade/trasmetti/corrispettivi/:clienteId
- * Trasmette corrispettivi all'AdE.
- * Body: { data?: 'YYYY-MM-DD', anno?: number, mese?: number }
- * Se `data` è fornita → trasmette solo quella giornata.
- * Se `anno` + `mese` → trasmette l'intero mese.
- */
-exports.trasmettiCorrispettivi = catchAsync(async (req, res, next) => {
-  const { clienteId } = req.params;
-  const { data, anno, mese } = req.body;
-
-  try {
-    let result;
-    if (data) {
-      result = await trasmettiCorrispettiviGiorno(clienteId, req.user._id, new Date(data));
-      res.status(200).json({
-        status: 'success',
-        messaggio: `${result.count} corrispettivi trasmessi per il ${data}.`,
-        data: result
-      });
-    } else if (anno && mese) {
-      result = await trasmettiCorrispettiviMese(clienteId, req.user._id, Number(anno), Number(mese));
-      res.status(200).json({
-        status: 'success',
-        messaggio: `${result.giorniTrasmessi} giorni trasmessi, ${result.giorniErrori} errori.`,
-        data: result
-      });
-    } else {
-      return next(new AppError('Specifica una data (data) o un periodo (anno + mese).', 400));
-    }
-  } catch (err) {
-    return next(new AppError(err.message, 400));
-  }
-});
-
 // ═══════════════════════════════════════════════════════
 //  CONFIGURAZIONE
 // ═══════════════════════════════════════════════════════
+// Nota: la trasmissione corrispettivi (scontrini) avviene via A-Cube
+// → vedere /api/v1/acube/scontrino/:clienteId
 
 /**
  * PATCH /api/v1/ade/config
@@ -265,7 +230,7 @@ exports.updateConfig = catchAsync(async (req, res) => {
  * Aggiorna il flag inDelega e la data delega di un cliente.
  */
 exports.updateDelegaCliente = catchAsync(async (req, res, next) => {
-  const { inDelega, delegaDal, trasmetteCorrispettivi } = req.body;
+  const { inDelega, delegaDal } = req.body;
   const { clienteId } = req.params;
 
   const cliente = await User.findOne({
@@ -279,7 +244,6 @@ exports.updateDelegaCliente = catchAsync(async (req, res, next) => {
   const updates = {};
   if (inDelega !== undefined) updates['ade.inDelega'] = inDelega;
   if (delegaDal !== undefined) updates['ade.delegaDal'] = delegaDal;
-  if (trasmetteCorrispettivi !== undefined) updates['ade.trasmetteCorrispettivi'] = trasmetteCorrispettivi;
 
   const updated = await User.findByIdAndUpdate(clienteId, updates, { new: true });
 

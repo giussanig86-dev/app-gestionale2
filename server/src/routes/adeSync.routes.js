@@ -21,10 +21,10 @@ router.get('/logs/:logId', ctrl.getLog);
 router.post('/sync', ctrl.triggerSyncAll);
 router.post('/sync/:clienteId', ctrl.triggerSyncCliente);
 
-// Trasmissione fatture e corrispettivi al SDI/AdE
+// Trasmissione fatture al SDI (via AdE diretta con certificato)
 router.post('/trasmetti/fattura/:fatturaId', ctrl.trasmettiFattura);
 router.post('/trasmetti/fatture/:clienteId', ctrl.trasmettiFattureCliente);
-router.post('/trasmetti/corrispettivi/:clienteId', ctrl.trasmettiCorrispettivi);
+// Nota: i corrispettivi (scontrini) vengono emessi tramite A-Cube → /api/v1/acube/scontrino/:clienteId
 
 // Gestione delega per cliente
 router.patch('/clienti/:clienteId/delega', ctrl.updateDelegaCliente);

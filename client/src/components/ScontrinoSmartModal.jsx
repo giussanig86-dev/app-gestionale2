@@ -1,26 +1,26 @@
 /**
- * TRASMISSIONE MODAL
- * Modal per trasmettere corrispettivi all'AdE.
+ * SCONTRINO SMART MODAL
+ * Modal per emettere documenti commerciali via A-Cube Scontrino Elettronico Smart.
  * Permette di selezionare la modalità:
  * - Giornaliera: un singolo giorno
- * - Mensile: un intero mese (una chiamata per giorno)
+ * - Mensile: un intero mese (un documento per giorno)
  */
 
 import { useState } from 'react'
-import { X, Send, CheckCircle, XCircle, RefreshCw, AlertTriangle } from 'lucide-react'
+import { X, Send, CheckCircle, XCircle, RefreshCw, AlertTriangle, Receipt } from 'lucide-react'
 import api from '@/lib/api'
 import { cn, MESI } from '@/lib/utils'
 
-export default function TrasmissioneModal({ clienteId, onClose }) {
+export default function ScontrinoSmartModal({ clienteId, onClose }) {
   const [modalita, setModalita] = useState('giorno') // 'giorno' | 'mese'
   const [data, setData] = useState(new Date().toISOString().slice(0, 10))
   const [anno, setAnno] = useState(new Date().getFullYear())
   const [mese, setMese] = useState(new Date().getMonth() + 1)
   const [loading, setLoading] = useState(false)
-  const [risultato, setRisultato] = useState(null) // { success, data }
+  const [risultato, setRisultato] = useState(null)
   const [errore, setErrore] = useState('')
 
-  async function handleTrasmetti() {
+  async function handleEmetti() {
     setLoading(true)
     setErrore('')
     setRisultato(null)
@@ -30,8 +30,8 @@ export default function TrasmissioneModal({ clienteId, onClose }) {
         ? { data }
         : { anno: Number(anno), mese: Number(mese) }
 
-      const res = await api.post(`/ade/trasmetti/corrispettivi/${clienteId}`, body)
-      setRisultato({ success: true, messaggio: res.data.messaggio, data: res.data.data })
+      const res = await api.post(`/acube/scontrino/${clienteId}`, body)
+      setRisultato({ messaggio: res.data.messaggio, data: res.data.data })
     } catch (err) {
       const msg = err.response?.data?.messaggio || err.response?.data?.message || err.message
       setErrore(msg)
@@ -40,7 +40,7 @@ export default function TrasmissioneModal({ clienteId, onClose }) {
     }
   }
 
-  const isCompleted = risultato?.success
+  const isCompleted = !!risultato
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -48,8 +48,11 @@ export default function TrasmissioneModal({ clienteId, onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <div className="flex items-center gap-2">
-            <Send className="w-5 h-5 text-blue-600" />
-            <h3 className="font-semibold text-lg">Trasmetti Corrispettivi AdE</h3>
+            <Receipt className="w-5 h-5 text-blue-600" />
+            <div>
+              <h3 className="font-semibold text-lg">Scontrino Elettronico Smart</h3>
+              <p className="text-xs text-gray-400">Powered by A-Cube</p>
+            </div>
           </div>
           {!loading && (
             <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600">
@@ -109,8 +112,7 @@ export default function TrasmissioneModal({ clienteId, onClose }) {
                       type="number"
                       value={anno}
                       onChange={(e) => setAnno(e.target.value)}
-                      min={2020}
-                      max={2099}
+                      min={2020} max={2099}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     />
                   </div>
@@ -130,11 +132,12 @@ export default function TrasmissioneModal({ clienteId, onClose }) {
               )}
 
               {/* Info */}
-              <div className="flex gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2.5 text-xs text-amber-700">
+              <div className="flex gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 text-xs text-blue-700">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
-                  Verranno trasmessi all'AdE solo i corrispettivi non ancora inviati nel periodo selezionato.
-                  Assicurati che il certificato dispositivo sia configurato nelle Impostazioni.
+                  I corrispettivi del periodo selezionato verranno aggregati e trasmessi come
+                  documento commerciale al portale Fatture e Corrispettivi dell'AdE tramite A-Cube.
+                  Solo i corrispettivi non ancora trasmessi saranno inclusi.
                 </span>
               </div>
 
@@ -159,7 +162,7 @@ export default function TrasmissioneModal({ clienteId, onClose }) {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-gray-50 rounded-xl p-3 text-center">
                     <p className="text-2xl font-bold text-green-600">{risultato.data.giorniTrasmessi || 0}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Giorni trasmessi</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Giorni emessi</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-3 text-center">
                     <p className="text-2xl font-bold text-red-500">{risultato.data.giorniErrori || 0}</p>
@@ -182,6 +185,10 @@ export default function TrasmissioneModal({ clienteId, onClose }) {
                   </div>
                 </div>
               )}
+
+              {risultato.data?.documentId && (
+                <p className="text-xs text-gray-400 text-center">ID documento: {risultato.data.documentId}</p>
+              )}
             </div>
           )}
         </div>
@@ -198,14 +205,14 @@ export default function TrasmissioneModal({ clienteId, onClose }) {
                 Annulla
               </button>
               <button
-                onClick={handleTrasmetti}
+                onClick={handleEmetti}
                 disabled={loading}
                 className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 {loading ? (
-                  <><RefreshCw className="w-4 h-4 animate-spin" /> Trasmissione...</>
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Emissione...</>
                 ) : (
-                  <><Send className="w-4 h-4" /> Trasmetti</>
+                  <><Send className="w-4 h-4" /> Emetti Scontrino</>
                 )}
               </button>
             </>
