@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, Settings, Shield, CreditCard, Bell, User, Building2, RefreshCw, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { Save, Settings, Shield, CreditCard, Bell, User, Building2, RefreshCw, CheckCircle, XCircle, Clock, Zap } from 'lucide-react'
 import api from '@/lib/api'
 import { cn, formatEuro } from '@/lib/utils'
 import { PIANI_SAAS } from '@/lib/constants'
@@ -24,10 +24,14 @@ export default function ImpostazioniPage() {
     enabled: false, certPath: '', certPassword: '', syncSchedule: '0 6 * * *', importOnlyAfter: '',
   })
   const [adeStatus, setAdeStatus] = useState(null)
+  const [acubeConfig, setAcubeConfig] = useState({ enabled: false, accessToken: '', refreshToken: '' })
+  const [acubeStatus, setAcubeStatus] = useState(null)
+  const [testingAcube, setTestingAcube] = useState(false)
 
   useEffect(() => {
     fetchProfilo()
     fetchAdeStatus()
+    fetchAcubeStatus()
   }, [])
 
   async function fetchProfilo() {
@@ -68,6 +72,57 @@ export default function ImpostazioniPage() {
       setAdeStatus(res.data.data)
     } catch {
       // Ignora se non disponibile
+    }
+  }
+
+  async function fetchAcubeStatus() {
+    try {
+      const res = await api.get('/acube/status')
+      const d = res.data.data
+      setAcubeStatus(d)
+      setAcubeConfig({
+        enabled: d.apiCube?.enabled || false,
+        accessToken: '',
+        refreshToken: '',
+      })
+    } catch {
+      // Ignora se non disponibile
+    }
+  }
+
+  async function handleSaveAcube(e) {
+    e.preventDefault()
+    setSaving(true)
+    setSuccess('')
+    try {
+      const payload = { enabled: acubeConfig.enabled }
+      if (acubeConfig.accessToken) payload.accessToken = acubeConfig.accessToken
+      if (acubeConfig.refreshToken) payload.refreshToken = acubeConfig.refreshToken
+      await api.patch('/acube/config', payload)
+      setSuccess('Configurazione A-Cube salvata con successo')
+      setTimeout(() => setSuccess(''), 3000)
+      setAcubeConfig((prev) => ({ ...prev, accessToken: '', refreshToken: '' }))
+      fetchAcubeStatus()
+    } catch (err) {
+      alert(err.response?.data?.messaggio || 'Errore salvataggio configurazione A-Cube')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleTestAcube() {
+    setTestingAcube(true)
+    try {
+      const res = await api.post('/acube/token')
+      if (res.data.success) {
+        setSuccess('Connessione A-Cube verificata con successo')
+        setTimeout(() => setSuccess(''), 3000)
+        fetchAcubeStatus()
+      }
+    } catch (err) {
+      alert(err.response?.data?.messaggio || 'Errore verifica credenziali A-Cube')
+    } finally {
+      setTestingAcube(false)
     }
   }
 
@@ -416,6 +471,88 @@ export default function ImpostazioniPage() {
               className="px-6 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2">
               <Save className="w-4 h-4" />{saving ? 'Salvataggio...' : 'Salva Configurazione'}
             </button>
+          </form>
+
+          {/* A-Cube Scontrino Elettronico Smart */}
+          <form onSubmit={handleSaveAcube} className="bg-white rounded-xl border border-gray-100 p-6 space-y-5">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-500" />
+              <h3 className="font-semibold text-gray-800">A-Cube — Scontrino Elettronico Smart</h3>
+            </div>
+            <p className="text-xs text-gray-500">
+              Integrazione con A-Cube per l'emissione e la trasmissione automatica dei documenti commerciali
+              all'Agenzia delle Entrate per i clienti esonerati dall'obbligo di fattura (tassisti, NCC, ecc.).
+              Richiede un account A-Cube con le credenziali OAuth2.
+            </p>
+
+            {/* Stato */}
+            {acubeStatus && (
+              <div className="flex items-center gap-3">
+                <span className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium',
+                  acubeStatus.apiCube?.enabled ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
+                )}>
+                  {acubeStatus.apiCube?.enabled ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                  {acubeStatus.apiCube?.enabled ? 'Attivo' : 'Non attivo'}
+                </span>
+                {acubeStatus.apiCube?.tokenExpiresAt && (
+                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    Token scade: {new Date(acubeStatus.apiCube.tokenExpiresAt).toLocaleDateString('it-IT')}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Toggle */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Abilita A-Cube</p>
+                <p className="text-xs text-gray-500 mt-0.5">Attiva l'emissione scontrini via API A-Cube</p>
+              </div>
+              <button type="button"
+                onClick={() => setAcubeConfig({ ...acubeConfig, enabled: !acubeConfig.enabled })}
+                className={cn(
+                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                  acubeConfig.enabled ? 'bg-amber-500' : 'bg-gray-200'
+                )}>
+                <span className={cn(
+                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                  acubeConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+                )} />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
+              <input type="password" value={acubeConfig.accessToken}
+                onChange={(e) => setAcubeConfig({ ...acubeConfig, accessToken: e.target.value })}
+                placeholder="Lascia vuoto per non modificare"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Refresh Token</label>
+              <input type="password" value={acubeConfig.refreshToken}
+                onChange={(e) => setAcubeConfig({ ...acubeConfig, refreshToken: e.target.value })}
+                placeholder="Lascia vuoto per non modificare"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400" />
+              <p className="text-xs text-gray-400 mt-1">
+                Ottieni le credenziali dal portale A-Cube. Il token viene rinnovato automaticamente alla scadenza.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button type="submit" disabled={saving}
+                className="px-5 py-2.5 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-2">
+                <Save className="w-4 h-4" />{saving ? 'Salvataggio...' : 'Salva'}
+              </button>
+              <button type="button" onClick={handleTestAcube} disabled={testingAcube || !acubeStatus?.apiCube?.enabled}
+                className="px-5 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-40 flex items-center gap-2">
+                <RefreshCw className={cn('w-4 h-4', testingAcube && 'animate-spin')} />
+                {testingAcube ? 'Verifica...' : 'Verifica connessione'}
+              </button>
+            </div>
           </form>
         </div>
       )}
